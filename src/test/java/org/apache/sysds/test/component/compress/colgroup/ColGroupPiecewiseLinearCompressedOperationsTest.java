@@ -102,7 +102,6 @@ public class ColGroupPiecewiseLinearCompressedOperationsTest extends AutomatedTe
 		numRows = NROWS;
 		numCols = NCOLS;
 
-		/// generate random matrix
 		double[][] data = getRandomMatrix(numRows, numCols, -30, 30, 1.0, SEED);
 		originalMB = DataConverter.convertToMatrixBlock(data);
 		originalMB.allocateDenseBlock();
@@ -112,12 +111,10 @@ public class ColGroupPiecewiseLinearCompressedOperationsTest extends AutomatedTe
 		CompressionSettings cs = new CompressionSettingsBuilder().create();
 		cs.setPiecewiseTargetLoss(TARGET_LOSS);
 
-		/// create ColGroupPiecewiseLinearCompressed instance
-		AColGroup result = ColGroupFactory.compressPiecewiseLinearFunctional(colIndexes, originalMB, cs);
+		AColGroup result = ColGroupFactory.compressPiecewiseLinearFunctionalSuccessive(colIndexes, originalMB, cs);
 		assertTrue(result instanceof ColGroupPiecewiseLinearCompressed);
 		piecewiseLinearColGroup = (ColGroupPiecewiseLinearCompressed) result;
 
-		/// decompress again
 		decompressedMB = decompress(piecewiseLinearColGroup);
 	}
 
@@ -993,22 +990,30 @@ public class ColGroupPiecewiseLinearCompressedOperationsTest extends AutomatedTe
 
 	@Test
 	public void testremoveEmptyColsSubset() {
-		assertNull(piecewiseLinearColGroup.removeEmptyColsSubset(null, null));
+		assertThrows(NotImplementedException.class, () -> {
+			piecewiseLinearColGroup.removeEmptyColsSubset(null, null);
+		});
 	}
 
 	@Test
 	public void testremoveEmptyRows() {
-		assertNull(piecewiseLinearColGroup.removeEmptyRows(null, 0));
+		assertThrows(NotImplementedException.class, () -> {
+			piecewiseLinearColGroup.removeEmptyRows(null, 0);
+		});
 	}
 
 	@Test
 	public void testsort() {
-		assertEquals(piecewiseLinearColGroup, piecewiseLinearColGroup.sort());
+		assertThrows(NotImplementedException.class, () -> {
+			piecewiseLinearColGroup.sort();
+		});
 	}
 
 	@Test
 	public void testreduceCols() {
-		assertNull(piecewiseLinearColGroup.reduceCols());
+		assertThrows(NotImplementedException.class, () -> {
+			piecewiseLinearColGroup.reduceCols();
+		});
 	}
 
 	@Test

@@ -84,57 +84,8 @@ public class ColGroupPiecewiseLinearCompressedTest extends AutomatedTestBase {
 	}
 
 	@Test
-	public void testCompressAndDecompressDP() {
-
-		// create random matrix
-		final int nrows = 50, ncols = 3;
-		double[][] data = getRandomMatrix(nrows, ncols, -3, 3, 1.0, SEED);
-		MatrixBlock in = DataConverter.convertToMatrixBlock(data);
-		in.allocateDenseBlock();
-
-		IColIndex colIndexes = ColIndexFactory.create(new int[] {0, 1, 2});
-		CompressionSettings cs = new CompressionSettingsBuilder().create();
-		cs.setPiecewiseTargetLoss(1e-8);
-
-		AColGroup result = ColGroupFactory.compressPiecewiseLinearFunctional(colIndexes, in, cs);
-		assertTrue(result instanceof ColGroupPiecewiseLinearCompressed);
-		ColGroupPiecewiseLinearCompressed plGroup = (ColGroupPiecewiseLinearCompressed) result;
-
-		// check the structure
-		int[][] breakpoints = plGroup.getBreakpointsPerCol();
-		double[][] slopes = plGroup.getSlopesPerCol();
-		double[][] intercepts = plGroup.getInterceptsPerCol();
-
-		assertEquals("wrong number of columns in breakpoints", ncols, breakpoints.length);
-		for(int c = 0; c < ncols; c++) {
-			assertTrue("breakpoints[" + c + "] needs at least 2 entries", breakpoints[c].length >= 2);
-			assertEquals("breakpoints[" + c + "] must start at 0", 0, breakpoints[c][0]);
-			assertEquals("breakpoints[" + c + "] must end at nrows", nrows, breakpoints[c][breakpoints[c].length - 1]);
-			int numSegs = breakpoints[c].length - 1;
-			assertEquals("slopes[" + c + "] length mismatch", numSegs, slopes[c].length);
-			assertEquals("intercepts[" + c + "] length mismatch", numSegs, intercepts[c].length);
-		}
-
-		// decompress and check reconstruction of column group
-		MatrixBlock recon = new MatrixBlock(nrows, ncols, false);
-		recon.allocateDenseBlock();
-		plGroup.decompressToDenseBlock(recon.getDenseBlock(), 0, nrows, 0, 0);
-		DenseBlock db = recon.getDenseBlock();
-
-		for(int r = 0; r < nrows; r++) {
-			for(int c = 0; c < ncols; c++) {
-				double val = db.get(r, c);
-				assertFalse("NaN at [" + r + "," + c + "]", Double.isNaN(val));
-				assertFalse("Infinite at [" + r + "," + c + "]", Double.isInfinite(val));
-				assertEquals("reconstruction error too large at [" + r + "," + c + "]", data[r][c], val, 1e-6);
-			}
-		}
-	}
-
-	@Test
 	public void testCompressAndDecompressSuccessive() {
 
-		// create random matrix
 		final int nrows = 50, ncols = 3;
 		double[][] data = getRandomMatrix(nrows, ncols, -3, 3, 1.0, SEED);
 		MatrixBlock in = DataConverter.convertToMatrixBlock(data);
@@ -144,12 +95,10 @@ public class ColGroupPiecewiseLinearCompressedTest extends AutomatedTestBase {
 		CompressionSettings cs = new CompressionSettingsBuilder().create();
 		cs.setPiecewiseTargetLoss(1e-8);
 
-		// create ColGroupPiecewiseLinearCompressed with successive compression
 		AColGroup result = ColGroupFactory.compressPiecewiseLinearFunctionalSuccessive(colIndexes, in, cs);
 		assertTrue(result instanceof ColGroupPiecewiseLinearCompressed);
 		ColGroupPiecewiseLinearCompressed plGroup = (ColGroupPiecewiseLinearCompressed) result;
 
-		// structure checks
 		int[][] bp = plGroup.getBreakpointsPerCol();
 		double[][] slopes = plGroup.getSlopesPerCol();
 		double[][] intercepts = plGroup.getInterceptsPerCol();
@@ -164,7 +113,6 @@ public class ColGroupPiecewiseLinearCompressedTest extends AutomatedTestBase {
 			assertEquals("intercepts[" + c + "] length mismatch", numSegs, intercepts[c].length);
 		}
 
-		// validate decompression
 		MatrixBlock recon = new MatrixBlock(nrows, ncols, false);
 		recon.allocateDenseBlock();
 		plGroup.decompressToDenseBlock(recon.getDenseBlock(), 0, nrows, 0, 0);
@@ -180,26 +128,13 @@ public class ColGroupPiecewiseLinearCompressedTest extends AutomatedTestBase {
 		}
 	}
 
-	/// Wrapper-Classes: Test setup for DP and successive compression
-
-	private void testRoundtripDP(double[][] data, int nrows, int ncols, double targetLoss, double tolerance,
-		int maxFailures) {
-		testRoundtrip(data, nrows, ncols, targetLoss, tolerance, maxFailures, false);
-	}
-
-	private void testRoundtripSuccessive(double[][] data, int nrows, int ncols, double targetLoss, double tolerance,
-		int maxFailures) {
-		testRoundtrip(data, nrows, ncols, targetLoss, tolerance, maxFailures, true);
-	}
-
 	/**
 	 * Set test setup: converting data in matrix block, set compression setting does compression, decompression,
 	 * validation
 	 */
-	private void testRoundtrip(double[][] data, int nrows, int ncols, double targetLoss, double tolerance,
-		int maxFailures, boolean successive) {
+	private void testRoundtripSuccessive(double[][] data, int nrows, int ncols, double targetLoss, double tolerance,
+		int maxFailures) {
 
-		/// create a matrix
 		MatrixBlock orig = DataConverter.convertToMatrixBlock(data);
 		orig.allocateDenseBlock();
 
@@ -207,17 +142,13 @@ public class ColGroupPiecewiseLinearCompressedTest extends AutomatedTestBase {
 		CompressionSettings cs = new CompressionSettingsBuilder().create();
 		cs.setPiecewiseTargetLoss(targetLoss);
 
-		/// choose compression
-		AColGroup result = successive ? ColGroupFactory.compressPiecewiseLinearFunctionalSuccessive(colIndexes, orig,
-			cs) : ColGroupFactory.compressPiecewiseLinearFunctional(colIndexes, orig, cs);
+		AColGroup result = ColGroupFactory.compressPiecewiseLinearFunctionalSuccessive(colIndexes, orig, cs);
 
 		assertTrue(result instanceof ColGroupPiecewiseLinearCompressed);
 		ColGroupPiecewiseLinearCompressed plGroup = (ColGroupPiecewiseLinearCompressed) result;
 
-		/// structure checks
 		checkStructure(plGroup, nrows, ncols);
 
-		/// decompression check
 		MatrixBlock recon = new MatrixBlock(nrows, ncols, false);
 		recon.allocateDenseBlock();
 		plGroup.decompressToDenseBlock(recon.getDenseBlock(), 0, nrows, 0, 0);
@@ -290,7 +221,6 @@ public class ColGroupPiecewiseLinearCompressedTest extends AutomatedTestBase {
 			for(int c = 0; c < ncols; c++)
 				data[r][c] = trend + rng.nextGaussian() * 1.5 + c * 2.0;
 		}
-		testRoundtripDP(data, nrows, ncols, 1.0, 4.0, 45);
 		testRoundtripSuccessive(data, nrows, ncols, 1.0, 4.0, 45);
 	}
 
@@ -304,8 +234,6 @@ public class ColGroupPiecewiseLinearCompressedTest extends AutomatedTestBase {
 			for(int r = 55; r < nrows; r++)
 				data[r][c] += 15.0;
 		}
-		// successive needs looser tolerance on jumps
-		testRoundtripDP(data, nrows, ncols, 5.0, 10.0, 50);
 		testRoundtripSuccessive(data, nrows, ncols, 25.0, 18.0, 55);
 	}
 
@@ -319,22 +247,18 @@ public class ColGroupPiecewiseLinearCompressedTest extends AutomatedTestBase {
 			for(int c = 0; c < ncols; c++)
 				data[r][c] = sine + rng.nextGaussian() * 0.8 + Math.sin(r * 0.2 + c) * 2.0;
 		}
-		// both struggle with high frequency; successive slightly worse
-		testRoundtripDP(data, nrows, ncols, 2.0, 2.0, 3500);
 		testRoundtripSuccessive(data, nrows, ncols, 2.0, 2.5, 2500);
 	}
 
 	@Test
 	public void testLowVarianceSingleColumn() {
 		double[][] data = getRandomMatrix(50, 1, -1, 1, 0.3, SEED);
-		testRoundtripDP(data, 50, 1, 0.1, 0.5, 5);
 		testRoundtripSuccessive(data, 50, 1, 0.05, 0.4, 3);
 	}
 
 	@Test
 	public void testSingleColumn() {
 		double[][] data = getRandomMatrix(50, 1, -1, 1, 1.0, SEED);
-		testRoundtripDP(data, 50, 1, 0.5, 1.0, 8);
 		testRoundtripSuccessive(data, 50, 1, 0.5, 1.0, 8);
 	}
 
@@ -342,15 +266,12 @@ public class ColGroupPiecewiseLinearCompressedTest extends AutomatedTestBase {
 	public void testKnownSegmentBoundaries() {
 		final int nrows = 60, ncols = 2;
 		double[][] data = buildMultiSegmentData(nrows, ncols);
-		// successive needs slightly higher targetLoss for same data
-		testRoundtripDP(data, nrows, ncols, 0.8, 5.0, 35);
 		testRoundtripSuccessive(data, nrows, ncols, 1.0, 5.0, 35);
 	}
 
 	@Test
 	public void testMultipleColumns() {
 		double[][] data = getRandomMatrix(80, 5, -5, 5, 1.5, SEED);
-		testRoundtripDP(data, 80, 5, 3.0, 4.0, 120);
 		testRoundtripSuccessive(data, 80, 5, 3.0, 4.0, 120);
 	}
 
@@ -437,22 +358,6 @@ public class ColGroupPiecewiseLinearCompressedTest extends AutomatedTestBase {
 
 		assertTrue("expected at least 3 segments", bps.length >= 3);
 		assertTrue("expected breakpoint near jump [10,20]", hasBreakInRange(bps, 8, 22));
-	}
-
-	@Test
-	public void testSuccessiveGlobalMSEWithinTarget() {
-		double[] col = getRandomColumn(40, SEED + 1);
-		CompressionSettings cs = new CompressionSettingsBuilder().create();
-		cs.setPiecewiseTargetLoss(1.5);
-
-		List<Integer> bps = PiecewiseLinearUtils.computeBreakpointSuccessive(col, cs);
-		double sse = 0.0;
-		for(int i = 0; i < bps.size() - 1; i++)
-			sse += PiecewiseLinearUtils.computeSegmentCost(col, bps.get(i), bps.get(i + 1));
-
-		double mse = sse / col.length;
-		assertTrue("global MSE=" + mse + " exceeds target=" + cs.getPiecewiseTargetLoss(),
-			mse <= cs.getPiecewiseTargetLoss() + 1e-10);
 	}
 
 	private boolean hasBreakInRange(int[] bps, int min, int max) {

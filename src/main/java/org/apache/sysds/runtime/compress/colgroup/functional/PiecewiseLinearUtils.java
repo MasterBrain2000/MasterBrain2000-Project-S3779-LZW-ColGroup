@@ -27,11 +27,6 @@ import java.util.Arrays;
 import java.util.List;
 
 public class PiecewiseLinearUtils {
-	/**
-	 * Utility methods for piecewise linear compression of matric columns supports compression used the segmented least
-	 * squares algorithm which is implemented with dynamic programming and a successive method, which puts all values in
-	 * a segment till the target loss is exceeded
-	 */
 
 	private PiecewiseLinearUtils() {
 	}
@@ -69,18 +64,22 @@ public class PiecewiseLinearUtils {
 		return column;
 	}
 
+	/**
+	 * Compresses a single column into a piecewise-linear model using a successive breakpoint algorithm.
+	 *
+	 * @param column the input data column
+	 * @param cs     compression settings controlling the allowed per-segment approximation error
+	 * @return a segmented regression representation of the column
+	 */
 	public static SegmentedRegression compressSuccessivePiecewiseLinear(double[] column, CompressionSettings cs) {
-		// compute Breakpoints for a Column with a sukzessive breakpoints algorithm
 
 		final List<Integer> breakpointsList = computeBreakpointSuccessive(column, cs);
 		final int[] breakpoints = breakpointsList.stream().mapToInt(Integer::intValue).toArray();
 
-		// get values for Regression
 		final int numSeg = breakpoints.length - 1;
 		final double[] slopes = new double[numSeg];
 		final double[] intercepts = new double[numSeg];
 
-		// Regress per Segment
 		for(int seg = 0; seg < numSeg; seg++) {
 			final int segstart = breakpoints[seg];
 			final int segEnd = breakpoints[seg + 1];
@@ -89,31 +88,6 @@ public class PiecewiseLinearUtils {
 			intercepts[seg] = line[1];
 		}
 		return new SegmentedRegression(breakpoints, slopes, intercepts);
-	}
-
-	/**
-	 * computes the segment cost
-	 *
-	 * @param column column values
-	 * @param start  start index
-	 * @param end    end index
-	 * @return SSE of the regression line over the segment
-	 */
-	public static double computeSegmentCost(double[] column, int start, int end) {
-		final int segSize = end - start;
-		if(segSize <= 1)
-			return 0.0;
-
-		final double[] ab = regressSegment(column, start, end);
-		final double slope = ab[0];
-		final double intercept = ab[1];
-
-		double sse = 0.0;
-		for(int i = start; i < end; i++) {
-			double err = column[i] - (slope * i + intercept);
-			sse += err * err;
-		}
-		return sse;
 	}
 
 	public static double[] regressSegment(double[] column, int start, int end) {

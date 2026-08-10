@@ -109,13 +109,13 @@ public class PiecewiseLinearCompressionPerformanceTest {
 		cs.setPiecewiseTargetLoss(loss);
 		IColIndex colIndexes = ColIndexFactory.create(numCol);
 
-		ColGroupFactory.compressPiecewiseLinearFunctional(colIndexes, mb, cs);
+		ColGroupFactory.compressPiecewiseLinearFunctionalSuccessive(colIndexes, mb, cs);
 
 		Timing t = new Timing();
 		AColGroup cg = null;
 		t.start();
 		for(int i = 0; i < REPS; i++)
-			cg = ColGroupFactory.compressPiecewiseLinearFunctional(colIndexes, mb, cs);
+			cg = ColGroupFactory.compressPiecewiseLinearFunctionalSuccessive(colIndexes, mb, cs);
 		double time = t.stop() / REPS;
 
 		long size = cg.getExactSizeOnDisk();
@@ -160,7 +160,7 @@ public class PiecewiseLinearCompressionPerformanceTest {
 		cs.setPiecewiseTargetLoss(loss);
 		IColIndex colIndexes = ColIndexFactory.create(nc);
 
-		AColGroup cg = ColGroupFactory.compressPiecewiseLinearFunctional(colIndexes, mb, cs);
+		AColGroup cg = ColGroupFactory.compressPiecewiseLinearFunctionalSuccessive(colIndexes, mb, cs);
 		int scalarReps = 100;
 		int analyticalReps = 50;
 		// 1. Benchmark Compressed Scalar Operations

@@ -308,7 +308,7 @@ public class ColGroupFactory {
 			}
 		}
 		else if(ct == CompressionType.PiecewiseLinearCompressed) {
-			return compressPiecewiseLinearFunctional(colIndexes, in, cs);
+			return compressPiecewiseLinearFunctionalSuccessive(colIndexes, in, cs);
 		}
 		else if(ct == CompressionType.DDCFOR) {
 			AColGroup g = directCompressDDC(colIndexes, cg);
@@ -1084,9 +1084,8 @@ public class ColGroupFactory {
 	}
 
 	/**
-	 * This method is the entry point to compress a matrix with piecewise linear compression The first method uses a
-	 * segmented least squares with dynamic programming to compress the columns The second method uses a successive
-	 * compression method, which compares each values in linear time and checks if the targetloss exceeded
+	 * This method is the entry point to compress a matrix with successive piecewise linear compression method, which
+	 * compares each values in linear time and checks if the targetloss exceeded
 	 *
 	 * @param colIndexes the column indices to compress
 	 * @param in         the input Matrixblock containing the data
@@ -1094,7 +1093,7 @@ public class ColGroupFactory {
 	 * @return a piecewise linear compressed column group
 	 */
 
-	public static AColGroup compressPiecewiseLinearFunctional(IColIndex colIndexes, MatrixBlock in,
+	public static AColGroup compressPiecewiseLinearFunctionalSuccessive(IColIndex colIndexes, MatrixBlock in,
 		CompressionSettings cs) {
 
 		final int numRows = in.getNumRows();
@@ -1116,11 +1115,6 @@ public class ColGroupFactory {
 		return ColGroupPiecewiseLinearCompressed.create(colIndexes, breakpointsPerCol, slopesPerCol, interceptsPerCol,
 			numRows);
 
-	}
-
-	public static AColGroup compressPiecewiseLinearFunctionalSuccessive(IColIndex colIndexes, MatrixBlock in,
-		CompressionSettings cs) {
-		return compressPiecewiseLinearFunctional(colIndexes, in, cs);
 	}
 
 	private AColGroup compressSDCFromSparseTransposedBlock(IColIndex cols, int nrUniqueEstimate, double tupleSparsity) {

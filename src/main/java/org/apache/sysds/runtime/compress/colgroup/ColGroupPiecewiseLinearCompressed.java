@@ -538,7 +538,7 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 	public static ColGroupPiecewiseLinearCompressed read(DataInput in) throws IOException {
 		// read ColGroupType written by AColGroup.write()
 		in.readByte();
-
+		
 		IColIndex colIndices = ColIndexFactory.read(in);
 
 		int numRows = in.readInt();
@@ -1304,35 +1304,35 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 	}
 
 	/**
-	 * piecewise linear groups encode all columns mathematically without sparse structural layouts. Returns null.
+	 * piecewise linear groups encode all columns mathematically without sparse structural layouts.
 	 */
 	@Override
 	public AColGroup removeEmptyColsSubset(IColIndex indexes, IntArrayList emptyCols) {
-		return null;
+		throw new NotImplementedException("removeEmptyColsSubset not implemented for PiecewiseLinear");
 	}
 
 	/**
-	 * row subset filtering for piecewise linear functions requires full segment rebuilding. Returns null.
+	 * row subset filtering for piecewise linear functions requires full segment rebuilding.
 	 */
 	@Override
 	public AColGroup removeEmptyRows(boolean[] emptyRows, int newNumRows) {
-		return null;
+		throw new NotImplementedException("removeEmptyRows not implemented for PiecewiseLinear");
 	}
 
 	/**
-	 * piecewise linear representation is already order-dependent on row indices. Returns null.
+	 * piecewise linear representation is already order-dependent on row indices.
 	 */
 	@Override
 	public AColGroup sort() {
-		return this;
+		throw new NotImplementedException("sort not implemented for PiecewiseLinear,since it should be already sorted");
 	}
 
 	/**
-	 * Piecewise linear column groups cannot be reduced to fewer columns; returns null.
+	 * Piecewise linear column groups cannot be reduced to fewer columns.
 	 */
 	@Override
 	public AColGroup reduceCols() {
-		return null;
+		throw new NotImplementedException("reduceCols not implemented for PiecewiseLinear");
 	}
 
 	/**
