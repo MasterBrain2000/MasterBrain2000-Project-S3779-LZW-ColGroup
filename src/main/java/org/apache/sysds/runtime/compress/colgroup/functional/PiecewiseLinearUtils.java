@@ -64,6 +64,15 @@ public class PiecewiseLinearUtils {
 		return column;
 	}
 
+	public static double[] getRow(MatrixBlock in, int rowIndex) {
+		final int numCols = in.getNumColumns();
+		final double[] row = new double[numCols];
+		for(int col = 0; col < numCols; col++) {
+			row[col] = in.get(rowIndex, col);
+		}
+		return row;
+	}
+
 	/**
 	 * Compresses a single column into a piecewise-linear model using a successive breakpoint algorithm.
 	 *

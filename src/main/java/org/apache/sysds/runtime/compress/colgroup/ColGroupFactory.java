@@ -1092,7 +1092,6 @@ public class ColGroupFactory {
 	 * @param cs         compression settings to define the target loss, which should be considered
 	 * @return a piecewise linear compressed column group
 	 */
-
 	public static AColGroup compressPiecewiseLinearFunctionalSuccessive(IColIndex colIndexes, MatrixBlock in,
 		CompressionSettings cs) {
 
@@ -1104,7 +1103,11 @@ public class ColGroupFactory {
 
 		for(int col = 0; col < numCols; col++) {
 			final int colIdx = colIndexes.get(col);
-			double[] column = PiecewiseLinearUtils.getColumn(in, colIdx);
+			double[] column;
+			if(cs.transposed)
+				column = PiecewiseLinearUtils.getRow(in, colIdx);
+			else
+				column = PiecewiseLinearUtils.getColumn(in, colIdx);
 			PiecewiseLinearUtils.SegmentedRegression fit = PiecewiseLinearUtils
 				.compressSuccessivePiecewiseLinear(column, cs);
 			breakpointsPerCol[col] = fit.getBreakpoints();

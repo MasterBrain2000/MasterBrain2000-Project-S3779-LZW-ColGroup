@@ -88,7 +88,6 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 	 * @return a new ColGroupPiecewiseLinearCompressed instance
 	 * @throws IllegalArgumentException if breakpoints are invalid or arrays are inconsistent
 	 */
-
 	public static AColGroup create(IColIndex colIndices, int[][] breakpointsPerCol, double[][] slopesPerCol,
 		double[][] interceptsPerCol, int numRows) {
 		final int numCols = colIndices.size();
@@ -538,7 +537,7 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 	public static ColGroupPiecewiseLinearCompressed read(DataInput in) throws IOException {
 		// read ColGroupType written by AColGroup.write()
 		in.readByte();
-		
+
 		IColIndex colIndices = ColIndexFactory.read(in);
 
 		int numRows = in.readInt();
