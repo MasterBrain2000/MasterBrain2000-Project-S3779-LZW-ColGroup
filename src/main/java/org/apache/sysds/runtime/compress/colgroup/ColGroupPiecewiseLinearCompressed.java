@@ -651,8 +651,6 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 			int start = bp[seg];
 			int end = bp[seg + 1];
 			int len = end - start;
-			if(len <= 0)
-				continue;
 			double m = slopes[seg];
 			double b = intercepts[seg];
 			double sumI = (double) len * (2.0 * start + (len - 1)) / 2.0;
