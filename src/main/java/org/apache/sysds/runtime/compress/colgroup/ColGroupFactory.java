@@ -1095,7 +1095,7 @@ public class ColGroupFactory {
 	public static AColGroup compressPiecewiseLinearFunctionalSuccessive(IColIndex colIndexes, MatrixBlock in,
 		CompressionSettings cs) {
 
-		final int numRows = in.getNumRows();
+		final int numRows = cs.transposed ? in.getNumColumns() : in.getNumRows();
 		final int numCols = colIndexes.size();
 		int[][] breakpointsPerCol = new int[numCols][];
 		double[][] slopesPerCol = new double[numCols][];
