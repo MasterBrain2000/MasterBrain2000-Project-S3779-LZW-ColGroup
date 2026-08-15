@@ -47,7 +47,6 @@ import org.apache.sysds.runtime.matrix.operators.BinaryOperator;
 import org.apache.sysds.runtime.matrix.operators.CMOperator;
 import org.apache.sysds.runtime.matrix.operators.ScalarOperator;
 import org.apache.sysds.runtime.matrix.operators.UnaryOperator;
-import org.apache.sysds.utils.MemoryEstimates;
 
 /**
  * This class represents a new ColGroup which is compresses column into segments (piecewise linear) to represent the
