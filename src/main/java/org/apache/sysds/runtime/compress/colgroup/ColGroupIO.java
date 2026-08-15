@@ -138,6 +138,13 @@ public interface ColGroupIO {
 		}
 	}
 
+	public static int[] readIntArray(int length, DataInput in) throws IOException {
+		int[] ret = new int[length];
+		for(int i = 0; i < length; i++)
+			ret[i] = in.readInt();
+		return ret;
+	}
+
 	public static double[] readDoubleArray(int length, DataInput in) throws IOException {
 		double[] ret = new double[length];
 		for(int i = 0; i < length; i++)

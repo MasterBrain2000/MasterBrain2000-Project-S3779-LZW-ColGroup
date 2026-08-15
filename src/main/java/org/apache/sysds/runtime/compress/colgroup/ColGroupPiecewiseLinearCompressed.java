@@ -64,6 +64,8 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 	double[][] interceptsPerCol;
 	int numRows;
 
+	private static final double DELTA = 1e-9;
+
 	protected ColGroupPiecewiseLinearCompressed(IColIndex colIndices) {
 		super(colIndices);
 	}
@@ -96,27 +98,24 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 				"bp.length=" + breakpointsPerCol.length + " != colIndices.size()=" + numCols);
 
 		for(int c = 0; c < numCols; c++) {
-			if(breakpointsPerCol[c].length < 1 || breakpointsPerCol[c][0] != 0 ||
-				breakpointsPerCol[c][breakpointsPerCol[c].length - 1] != numRows)
+			final int[] bp = breakpointsPerCol[c];
+			if(bp.length < 2 || bp[0] != 0 || bp[bp.length - 1] != numRows)
 				throw new IllegalArgumentException(
-					"Invalid breakpoints for col " + c + ": must start=0, end=numRows, >=1 pts");
+					"Invalid breakpoints for col " + c + ": must start=0, end=numRows, >=2 pts");
+
+			for(int i = 1; i < bp.length; i++) {
+				if(bp[i] <= bp[i - 1])
+					throw new IllegalArgumentException(
+						"Invalid breakpoints for col " + c + ": must be strictly increasing");
+			}
 
 			if(slopesPerCol[c].length != interceptsPerCol[c].length ||
 				slopesPerCol[c].length != breakpointsPerCol[c].length - 1)
 				throw new IllegalArgumentException("Inconsistent array lengths col " + c);
 		}
 
-		int[][] bpCopy = new int[numCols][];
-		double[][] slopeCopy = new double[numCols][];
-		double[][] interceptCopy = new double[numCols][];
-		// defensive copy to prevent external modification
-		for(int c = 0; c < numCols; c++) {
-			bpCopy[c] = Arrays.copyOf(breakpointsPerCol[c], breakpointsPerCol[c].length);
-			slopeCopy[c] = Arrays.copyOf(slopesPerCol[c], slopesPerCol[c].length);
-			interceptCopy[c] = Arrays.copyOf(interceptsPerCol[c], interceptsPerCol[c].length);
-		}
-
-		return new ColGroupPiecewiseLinearCompressed(colIndices, bpCopy, slopeCopy, interceptCopy, numRows);
+		return new ColGroupPiecewiseLinearCompressed(colIndices, breakpointsPerCol, slopesPerCol, interceptsPerCol,
+			numRows);
 
 	}
 
@@ -132,44 +131,28 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 	 */
 	@Override
 	public void decompressToDenseBlock(DenseBlock db, int rl, int ru, int offR, int offC) {
-		if(db == null || _colIndexes == null || _colIndexes.size() == 0 || breakpointsPerCol == null ||
-			slopesPerCol == null || interceptsPerCol == null) {
-			return;
-		}
 		for(int col = 0; col < _colIndexes.size(); col++) {
 			final int colIndex = _colIndexes.get(col);
 			int[] breakpoints = breakpointsPerCol[col];
 			double[] slopes = slopesPerCol[col];
 			double[] intercepts = interceptsPerCol[col];
-			// per segment in this column
 			for(int seg = 0; seg + 1 < breakpoints.length; seg++) {
 				int segStart = breakpoints[seg];
 				int segEnd = breakpoints[seg + 1];
-				if(segStart >= segEnd)
-					continue;
-
-				double currentSlopeInSegment = slopes[seg];
-				double currentInterceptInSegment = intercepts[seg];
-				// intersect segment with requested row range [rl, ru)
-
 				int rowStart = Math.max(segStart, rl);
 				int rowEnd = Math.min(segEnd, ru);
 				if(rowStart >= rowEnd)
 					continue;
 
-				// Fill DenseBlock für this column and Segment
+				double currentSlopeInSegment = slopes[seg];
+				double currentInterceptInSegment = intercepts[seg];
+				int dbCol = offC + colIndex;
 				for(int row = rowStart; row < rowEnd; row++) {
 					double yhat = currentSlopeInSegment * row + currentInterceptInSegment;
 					int dbRow = offR + row;
-					int dbCol = offC + colIndex;
-
-					if(dbRow >= 0 && dbRow < db.numRows() && dbCol >= 0 && dbCol < db.numCols()) {
-						db.set(dbRow, dbCol, yhat);
-					}
+					db.set(dbRow, dbCol, yhat);
 				}
-
 			}
-
 		}
 	}
 
@@ -194,14 +177,12 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 	 */
 	@Override
 	public double getIdx(int r, int colIdx) {
-		// safety check
 		if(r < 0 || r >= numRows || colIdx < 0 || colIdx >= _colIndexes.size()) {
-			return 0.0;
+			throw new DMLCompressionException("Invalid row or column index: r=" + r + ", colIdx=" + colIdx);
 		}
 		int[] breakpoints = breakpointsPerCol[colIdx];
 		double[] slopes = slopesPerCol[colIdx];
 		double[] intercepts = interceptsPerCol[colIdx];
-		// binary search for the segment containing row r
 		int lowerBound = 0;
 		int higherBound = breakpoints.length - 2;
 		while(lowerBound <= higherBound) {
@@ -239,30 +220,24 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 	@Override
 	public long getExactSizeOnDisk() {
 		long ret = super.getExactSizeOnDisk();
+		ret += 4;
 		int numCols = _colIndexes.size();
-		ret += 8L * numCols * 3; // array reference pointers
-		ret += 24L * 3; // outer array headers
-		ret += 4L; // numRows field
-
 		for(int c = 0; c < numCols; c++) {
-			ret += (long) MemoryEstimates.intArrayCost(breakpointsPerCol[c].length);
-			ret += (long) MemoryEstimates.doubleArrayCost(slopesPerCol[c].length);
-			ret += (long) MemoryEstimates.doubleArrayCost(interceptsPerCol[c].length);
+			final int numSegs = slopesPerCol[c].length;
+			final int numBreakpoints = breakpointsPerCol[c].length;
+			final int numIntercepts = interceptsPerCol[c].length;
+			ret += 4 + 4L * numBreakpoints;
+			ret += 4 + 8L * numSegs;
+			ret += 4 + 8L * numIntercepts;
 		}
-
 		return ret;
-
 	}
 
 	/**
-	 * Computes the column sums of the decompressed matrix using sum of arithmetic series Where sumX = len * (2*start +
-	 * len - 1) / 2
+	 * Accumulates the sum of all decompressed values across all columns into c[0].
 	 *
 	 * @param c     output array to accumulate column sums into
 	 * @param nRows number of rows, which is used because it is covered by the breakpoints
-	 */
-	/**
-	 * Accumulates the sum of all decompressed values across all columns into c[0].
 	 */
 	@Override
 	public void computeSum(double[] c, int nRows) {
@@ -368,29 +343,32 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 	 * @param isRowSafe True if the binary op is applied to an entire zero row and all results are zero
 	 * @return a new ColGroupPiecewiseLinearCompressed with updated coefficients
 	 */
-
 	@Override
 	public AColGroup binaryRowOpLeft(BinaryOperator op, double[] v, boolean isRowSafe) {
 		final int numCols = _colIndexes.size();
 		double[][] newIntercepts = new double[numCols][];
 		double[][] newSlopes = new double[numCols][];
-		final boolean isAddSub = op.fn instanceof Plus || op.fn instanceof Minus;
+		final boolean isAdd = op.fn instanceof Plus;
+		final boolean isSub = op.fn instanceof Minus;
+		final boolean isMul = op.fn instanceof Multiply;
 
-		if(!isAddSub && !(op.fn instanceof Multiply || op.fn instanceof Divide))
+		if(!isAdd && !isSub && !isMul)
 			throw new NotImplementedException("Unsupported binary op: " + op.fn.getClass().getSimpleName());
 
 		for(int col = 0; col < numCols; col++) {
 			double rowValue = v[_colIndexes.get(col)];
 			int numSegs = interceptsPerCol[col].length;
 			newIntercepts[col] = new double[numSegs];
-
-			// Plus/Minus: slope is translation-invariant, only intercept shifts
-			newSlopes[col] = isAddSub ? slopesPerCol[col].clone() : new double[numSegs];
-
+			newSlopes[col] = new double[numSegs];
 			for(int seg = 0; seg < numSegs; seg++) {
+				final double slope = slopesPerCol[col][seg];
 				newIntercepts[col][seg] = op.fn.execute(rowValue, interceptsPerCol[col][seg]);
-				if(!isAddSub)
-					newSlopes[col][seg] = op.fn.execute(rowValue, slopesPerCol[col][seg]);
+				if(isAdd)
+					newSlopes[col][seg] = slope;
+				else if(isSub)
+					newSlopes[col][seg] = -slope;
+				else if(isMul)
+					newSlopes[col][seg] = slope * rowValue;
 			}
 		}
 		return new ColGroupPiecewiseLinearCompressed(_colIndexes, breakpointsPerCol, newSlopes, newIntercepts, numRows);
@@ -420,14 +398,12 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 		for(int col = 0; col < numCols; col++) {
 			double val = v[_colIndexes.get(col)];
 			int numSegs = interceptsPerCol[col].length;
-			// Plus/Minus shifts intercept only, slopes are unchanged
-			newSlopes[col] = isAddSub ? slopesPerCol[col].clone() : new double[numSegs];
 			newIntercepts[col] = new double[numSegs];
+			newSlopes[col] = new double[numSegs];
 
 			for(int seg = 0; seg < numSegs; seg++) {
 				newIntercepts[col][seg] = op.fn.execute(interceptsPerCol[col][seg], val);
-				if(!isAddSub)
-					newSlopes[col][seg] = op.fn.execute(slopesPerCol[col][seg], val);
+				newSlopes[col][seg] = isAddSub ? slopesPerCol[col][seg] : op.fn.execute(slopesPerCol[col][seg], val);
 			}
 		}
 		return new ColGroupPiecewiseLinearCompressed(_colIndexes, breakpointsPerCol, newSlopes, newIntercepts, numRows);
@@ -456,7 +432,6 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 	 * @param pattern the value to search for
 	 * @return true if the pattern is found
 	 */
-
 	private boolean colContainsValue(int col, double pattern) {
 		int[] breakpoints = breakpointsPerCol[col];
 		double[] intercepts = interceptsPerCol[col];
@@ -464,37 +439,29 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 		for(int seg = 0; seg < breakpoints.length - 1; seg++) {
 			int start = breakpoints[seg];
 			int len = breakpoints[seg + 1] - start;
-			if(len <= 0)
-				continue;
-
 			double b = intercepts[seg];
 			double m = slopes[seg];
 
 			if(m == 0.0) {
-				// constant segment: all values equal b
 				if(Double.compare(b, pattern) == 0)
 					return true;
 				continue;
 			}
 
-			// check if pattern lies on the line: solve m*x + b = pattern for x
 			double x = (pattern - b) / m;
-			int xi = (int) x;
-			if(xi >= start && xi < start + len && Double.compare(m * xi + b, pattern) == 0)
+			long xi = Math.round(x);
+			if(xi >= start && xi < start + len && Math.abs((m * xi + b) - pattern) <= DELTA)
 				return true;
 		}
 		return false;
 	}
 
 	private AColGroup decompress() {
-		IColIndex columns = ColIndexFactory.create(numRows);
 		MatrixBlock mb = new MatrixBlock(numRows, getNumCols(), false);
-
 		mb.allocateDenseBlock();
 		decompressToDenseBlock(mb.getDenseBlock(), 0, numRows, 0, 0);
 		mb.recomputeNonZeros();
-
-		return ColGroupUncompressed.create(mb, columns);
+		return ColGroupUncompressed.create(mb, _colIndexes);
 	}
 
 	@Override
@@ -510,43 +477,27 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 
 	}
 
-	private static int[][] read2DIntegerArray(DataInput in, int numRows) throws IOException {
-		int[][] twoDimArray = new int[numRows][];
-		for(int i = 0; i < numRows; i++) {
-			int twoDimArray_lenght = in.readInt();
-			twoDimArray[i] = new int[twoDimArray_lenght];
-			for(int j = 0; j < twoDimArray_lenght; j++) {
-				twoDimArray[i][j] = in.readInt();
-			}
-		}
-		return twoDimArray;
-	}
-
-	private static double[][] read2DDoubleArray(DataInput in, int numRows) throws IOException {
-		double[][] twoDimArray = new double[numRows][];
-		for(int i = 0; i < numRows; i++) {
-			int twoDimArray_lenght = in.readInt();
-			twoDimArray[i] = new double[twoDimArray_lenght];
-			for(int j = 0; j < twoDimArray_lenght; j++) {
-				twoDimArray[i][j] = in.readDouble();
-			}
-		}
-		return twoDimArray;
-	}
-
 	public static ColGroupPiecewiseLinearCompressed read(DataInput in) throws IOException {
-		// read ColGroupType written by AColGroup.write()
-		in.readByte();
-
 		IColIndex colIndices = ColIndexFactory.read(in);
-
 		int numRows = in.readInt();
 		int numCols = colIndices.size();
+		int[][] breakpointsPerCol = new int[numCols][];
+		double[][] slopesPerCol = new double[numCols][];
+		double[][] interceptsPerCol = new double[numCols][];
+		for(int c = 0; c < numCols; c++) {
+			int len = in.readInt();
+			breakpointsPerCol[c] = ColGroupIO.readIntArray(len, in);
+		}
 
-		int[][] breakpointsPerCol = read2DIntegerArray(in, numCols);
-		double[][] slopesPerCol = read2DDoubleArray(in, numCols);
-		double[][] interceptsPerCol = read2DDoubleArray(in, numCols);
+		for(int c = 0; c < numCols; c++) {
+			int len = in.readInt();
+			slopesPerCol[c] = ColGroupIO.readDoubleArray(len, in);
+		}
 
+		for(int c = 0; c < numCols; c++) {
+			int len = in.readInt();
+			interceptsPerCol[c] = ColGroupIO.readDoubleArray(len, in);
+		}
 		return new ColGroupPiecewiseLinearCompressed(colIndices, breakpointsPerCol, slopesPerCol, interceptsPerCol,
 			numRows);
 	}
