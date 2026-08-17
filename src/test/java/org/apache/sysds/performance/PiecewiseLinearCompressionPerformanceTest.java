@@ -34,9 +34,8 @@ import org.apache.sysds.utils.stats.Timing;
 import org.apache.sysds.test.TestUtils;
 
 /**
- * Performance benchmark for piecewise linear compression. Successive is benchmarked across large matrices to show
- * scalability. DP is only used as a quality reference on small matrices due to quadratic complexity
- *
+ * Performance benchmark for Successive piecewise linear compression. Successive is benchmarked across large matrices to
+ * show scalability.
  */
 public class PiecewiseLinearCompressionPerformanceTest {
 
@@ -65,7 +64,6 @@ public class PiecewiseLinearCompressionPerformanceTest {
 		return mb;
 	}
 
-	/// returns a average number of segments per column
 	private static double avgSegments(AColGroup cg) {
 		int[][] breakpoints = ((ColGroupPiecewiseLinearCompressed) cg).getBreakpointsPerCol();
 		int total = 0;

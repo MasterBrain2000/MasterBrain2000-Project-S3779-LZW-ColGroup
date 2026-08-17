@@ -49,19 +49,16 @@ import org.apache.sysds.runtime.matrix.operators.ScalarOperator;
 import org.apache.sysds.runtime.matrix.operators.UnaryOperator;
 
 /**
- * This class represents a new ColGroup which is compresses column into segments (piecewise linear) to represent the
- * original Data each column is approximate by a set of linear segments defined by breakpoints, slopes and intercepts
+ * This class represents a new ColGroup which compresses each column into a set of contiguous linear segments using
+ * piecewise linear compression. These segements are defined by Breakpoints: The row indices that define the start and
+ * end boundaries of each segment. Slopes: The rate of change (gradient) of the regression line for each segment.
+ * Intercepts: The y-intercept of the regression line for each segment.
  */
-
 public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
-	/**
-	 * breakpoints indices per column to define the segment boundaries slopes of the regression line per segment per
-	 * column intercepts of the regression line per segment per column
-	 */
-	int[][] breakpointsPerCol;
-	double[][] slopesPerCol;
-	double[][] interceptsPerCol;
-	int numRows;
+	private int[][] breakpointsPerCol;
+	private double[][] slopesPerCol;
+	private double[][] interceptsPerCol;
+	private int numRows;
 
 	private static final double DELTA = 1e-9;
 

@@ -79,9 +79,6 @@ import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-/**
- * Tests for ColGroupPiecewiseLinearCompressed operations.
- */
 public class ColGroupPiecewiseLinearCompressedOperationsTest extends AutomatedTestBase {
 
 	private static final long SEED = 42L;
@@ -328,7 +325,7 @@ public class ColGroupPiecewiseLinearCompressedOperationsTest extends AutomatedTe
 	}
 
 	@Test
-	public void testGetExactSizeOnDisk() {
+	public void testGetExactSizeOnDisk() throws IOException {
 		Random rng = new Random(SEED);
 		int rows = 80 + rng.nextInt(40);
 		int numSegs = 1 + rng.nextInt(3);
@@ -345,13 +342,21 @@ public class ColGroupPiecewiseLinearCompressedOperationsTest extends AutomatedTe
 			slopes[s] = rng.nextDouble() * 4 - 2;
 			intercepts[s] = rng.nextDouble() * 4 - 2;
 		}
-		/// PLC Piecewise Linear Compressed
-		AColGroup colGroupPLC = ColGroupPiecewiseLinearCompressed.create(
-			ColIndexFactory.create(new int[] {rng.nextInt(20)}), new int[][] {breakpoints}, new double[][] {slopes},
-			new double[][] {intercepts}, rows);
 
-		assertTrue("disk size should be positive", colGroupPLC.getExactSizeOnDisk() > 0);
-		assertTrue("num values should be positive", colGroupPLC.getNumValues() > 0);
+		ColGroupPiecewiseLinearCompressed colGroupPLC = (ColGroupPiecewiseLinearCompressed) ColGroupPiecewiseLinearCompressed
+			.create(ColIndexFactory.create(new int[] {rng.nextInt(20)}), new int[][] {breakpoints},
+				new double[][] {slopes}, new double[][] {intercepts}, rows);
+
+		int expectedValues = (3 * numSegs) + 1;
+		assertEquals("Exact number of values mismatch", expectedValues, colGroupPLC.getNumValues());
+
+		ByteArrayOutputStream bos = new ByteArrayOutputStream();
+		DataOutputStream dos = new DataOutputStream(bos);
+		colGroupPLC.write(dos);
+		dos.flush();
+
+		assertEquals("Size on disk should exactly match actual serialized bytes", bos.size(),
+			colGroupPLC.getExactSizeOnDisk());
 	}
 
 	@Override
@@ -1146,5 +1151,27 @@ public class ColGroupPiecewiseLinearCompressedOperationsTest extends AutomatedTe
 
 		MatrixBlock deserializedMB = decompress(deserializedGroup);
 		checkMatrixEquals("Deserialized group does not match original", decompressedMB, deserializedMB);
+	}
+
+	@Test
+	public void testFactoryCompressTransposed() {
+		CompressionSettings cs = new CompressionSettingsBuilder().create();
+		cs.transposed = true;
+		AColGroup result = ColGroupFactory.compressPiecewiseLinearFunctionalSuccessive(colIndexes, originalMB, cs);
+		assertTrue(result instanceof ColGroupPiecewiseLinearCompressed);
+		ColGroupPiecewiseLinearCompressed plc = (ColGroupPiecewiseLinearCompressed) result;
+		int expectedRows = originalMB.getNumColumns();
+		MatrixBlock decompressed = new MatrixBlock(expectedRows, numCols, false);
+		decompressed.allocateDenseBlock();
+		plc.decompressToDenseBlock(decompressed.getDenseBlock(), 0, expectedRows, 0, 0);
+		decompressed.recomputeNonZeros();
+		assertEquals("Decompressed matrix should match original", expectedRows, decompressed.getNumRows());
+		for(int r = 0; r < expectedRows; r++)
+			for(int c = 0; c < numCols; c++) {
+				assertEquals("Mismatch at decompressed row " + r + " col " + c, plc.getIdx(r, c),
+					decompressed.get(r, c), DELTA);
+				assertEquals("Compression loss exceeded target at transposed indices" + r + " col " + c,
+					originalMB.get(colIndexes.get(c), r), decompressed.get(r, c), TARGET_LOSS);
+			}
 	}
 }
