@@ -788,7 +788,7 @@ public class ColGroupPiecewiseLinearCompressed extends AColGroupCompressed {
 	 */
 	@Override
 	public boolean sameIndexStructure(AColGroupCompressed that) {
-		return that instanceof ColGroupPiecewiseLinearCompressed;
+		return false;
 	}
 
 	/**

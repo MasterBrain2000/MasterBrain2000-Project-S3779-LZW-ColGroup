@@ -704,11 +704,7 @@ public class ColGroupPiecewiseLinearCompressedOperationsTest extends AutomatedTe
 
 	@Test
 	public void testsameIndexStructure() {
-		assertTrue(piecewiseLinearColGroup.sameIndexStructure(piecewiseLinearColGroup));
-		ColGroupPiecewiseLinearCompressed other = (ColGroupPiecewiseLinearCompressed) ColGroupPiecewiseLinearCompressed
-			.create(ColIndexFactory.create(new int[] {0}), new int[][] {{0, numRows}}, new double[][] {{0.5}},
-				new double[][] {{1.0}}, numRows);
-		assertTrue(piecewiseLinearColGroup.sameIndexStructure(other));
+		assertFalse(piecewiseLinearColGroup.sameIndexStructure(piecewiseLinearColGroup));
 	}
 
 	@Test
